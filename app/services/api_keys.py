@@ -285,3 +285,62 @@ def delete_api_key(db: Session, key_id: UUID, user_id: UUID):
 
     db.delete(api_key)
     db.commit()
+
+
+def rollover_api_key(
+    db: Session, expired_key_id: UUID, user_id: UUID, expiry: str
+) -> APIKey:
+    """
+    Rollover an expired API key by creating a new key with the same permissions.
+
+    Args:
+        db: Database session
+        expired_key_id: ID of the expired API key
+        user_id: User ID (for authorization)
+        expiry: Expiry format for the new key (1H, 1D, 1M, 1Y)
+
+    Returns:
+        New API key object
+
+    Raises:
+        HTTPException: If key not found, not expired, or not owned by user
+    """
+    # Get the expired key
+    expired_key = (
+        db.query(APIKey)
+        .filter(APIKey.id == expired_key_id, APIKey.user_id == user_id)
+        .first()
+    )
+
+    if not expired_key:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="API key not found"
+        )
+
+    # Verify it's actually expired
+    if expired_key.expires_at > datetime.utcnow():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="API key has not expired yet. Only expired keys can be rolled over.",
+        )
+
+    # Get permissions from the expired key
+    import json
+
+    permissions = json.loads(expired_key.permissions or '["read"]')
+
+    # Create new key with same permissions but new name
+    new_key_name = (
+        f"{expired_key.name}-rollover-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+    )
+
+    # Create the new key
+    new_key = create_api_key(
+        db=db,
+        user_id=user_id,
+        name=new_key_name,
+        permissions=permissions,
+        expiry=expiry,
+    )
+
+    return new_key

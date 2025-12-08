@@ -50,6 +50,11 @@ def create_user(db: Session, user_data: UserSignup) -> User:
     db.commit()
     db.refresh(db_user)
 
+    # Auto-create wallet for new user
+    from app.services.wallet import create_wallet
+
+    create_wallet(db, db_user.id)
+
     return db_user
 
 

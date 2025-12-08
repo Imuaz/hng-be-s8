@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.config import settings
 from app.database import engine, Base
-from app.routers import auth, api_keys, protected
+from app.routers import auth, api_keys, protected, wallet
 
 
 @asynccontextmanager
@@ -28,9 +28,9 @@ async def lifespan(app: FastAPI):
 
 # Create FastAPI application
 app = FastAPI(
-    title="Authentication + API Key Service",
-    description="Task 3: Mini Authentication + API Key System for Service-to-Service Access",
-    version="1.0.0",
+    title="Wallet Service with Paystack, JWT & API Keys",
+    description="Complete wallet service with Google OAuth, API key management, Paystack deposits, and transfers",
+    version="2.0.0",
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
@@ -48,6 +48,7 @@ app.add_middleware(
 # Include routers
 app.include_router(auth.router)
 app.include_router(api_keys.router)
+app.include_router(wallet.router)
 app.include_router(protected.router)
 
 
@@ -57,18 +58,26 @@ async def root():
     Root endpoint with API information and available endpoints.
     """
     return {
-        "message": "Authentication + API Key Service",
-        "version": "1.0.0",
+        "message": "Wallet Service with Paystack, JWT & API Keys",
+        "version": "2.0.0",
         "documentation": "/docs",
         "endpoints": {
             "authentication": {
                 "signup": "POST /auth/signup",
                 "login": "POST /auth/login",
+                "google_oauth": "GET /auth/google",
             },
             "api_keys": {
                 "create": "POST /keys/create",
                 "list": "GET /keys",
+                "rollover": "POST /keys/rollover",
                 "revoke": "DELETE /keys/{key_id}",
+            },
+            "wallet": {
+                "balance": "GET /wallet/balance",
+                "deposit": "POST /wallet/deposit",
+                "transfer": "POST /wallet/transfer",
+                "transactions": "GET /wallet/transactions",
             },
             "protected_demos": {
                 "user_only": "GET /protected/user (JWT only)",
@@ -84,7 +93,7 @@ async def health_check():
     """
     Health check endpoint.
     """
-    return {"status": "healthy", "service": "Authentication + API Key Service"}
+    return {"status": "healthy", "service": "Wallet Service with Paystack & API Keys"}
 
 
 if __name__ == "__main__":

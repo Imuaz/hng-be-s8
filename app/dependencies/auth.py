@@ -175,3 +175,38 @@ async def require_service(
             detail="API key authentication required",
         )
     return service
+
+
+def require_permission(permission: str):
+    """
+    Dependency factory to require specific permission.
+    Works with both JWT (always has all permissions) and API keys.
+
+    Args:
+        permission: Required permission (deposit, transfer, read)
+
+    Returns:
+        Dependency function that validates permission
+    """
+
+    async def permission_checker(auth: dict = Depends(get_current_auth)) -> dict:
+        # Users (JWT) have all permissions
+        if auth.get("type") == "user":
+            return auth
+
+        # Services (API key) must have the specific permission
+        if auth.get("type") == "service":
+            permissions = auth.get("permissions", [])
+            if permission not in permissions:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"API key does not have '{permission}' permission",
+                )
+            return auth
+
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication type",
+        )
+
+    return permission_checker

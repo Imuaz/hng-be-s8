@@ -6,12 +6,18 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 from typing import List
 from app.database import get_db
-from app.schemas.auth import APIKeyCreate, APIKeyResponse, APIKeyListResponse
+from app.schemas.auth import (
+    APIKeyCreate,
+    APIKeyResponse,
+    APIKeyListResponse,
+    APIKeyRolloverRequest,
+)
 from app.services.api_keys import (
     create_api_key,
     list_user_api_keys,
     revoke_api_key,
     delete_api_key,
+    rollover_api_key,
 )
 from app.dependencies.auth import get_current_auth
 from uuid import UUID
@@ -34,7 +40,8 @@ async def create_new_api_key(
 
     **Request Body:**
     - `name`: Descriptive name for the API key (1-100 characters)
-    - `expires_in_days`: Optional expiration period in days (1-3650, default: 365)
+    - `permissions`: List of permissions (deposit, transfer, read)
+    - `expiry`: Expiry format (1H, 1D, 1M, 1Y)
 
     **Returns:**
     - Complete API key information including the generated key
@@ -43,6 +50,7 @@ async def create_new_api_key(
     **Errors:**
     - `401 Unauthorized`: Invalid or missing JWT token
     - `403 Forbidden`: Only user accounts can create API keys
+    - `400 Bad Request`: Maximum 5 active keys exceeded
 
     **Usage:**
     Use the generated API key in requests via the `x-api-key` header:
@@ -63,10 +71,54 @@ async def create_new_api_key(
         db,
         user_id=auth["user_id"],
         name=key_data.name,
-        expires_in_days=key_data.expires_in_days,
+        permissions=key_data.permissions,
+        expiry=key_data.expiry,
     )
 
     return api_key
+
+
+@router.post(
+    "/rollover", response_model=APIKeyResponse, status_code=status.HTTP_201_CREATED
+)
+async def rollover_expired_key(
+    rollover_data: APIKeyRolloverRequest,
+    auth: dict = Depends(get_current_auth),
+    db: Session = Depends(get_db),
+):
+    """
+    Rollover an expired API key with same permissions.
+
+    **Authentication:** Requires JWT Bearer token (user authentication only)
+
+    **Request Body:**
+    - `expired_key_id`: ID of the expired API key
+    - `expiry`: Expiry format for new key (1H, 1D, 1M, 1Y)
+
+    **Returns:**
+    - New API key with same permissions
+
+    **Errors:**
+    - `400 Bad Request`: Key not expired or max keys limit
+    - `404 Not Found`: Key not found
+    """
+    # Only users can rollover their API keys
+    if auth["type"] != "user":
+        from fastapi import HTTPException
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only user accounts can rollover API keys",
+        )
+
+    new_key = rollover_api_key(
+        db,
+        expired_key_id=rollover_data.expired_key_id,
+        user_id=auth["user_id"],
+        expiry=rollover_data.expiry,
+    )
+
+    return new_key
 
 
 @router.get("", response_model=List[APIKeyListResponse])
