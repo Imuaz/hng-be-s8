@@ -3,6 +3,7 @@ API Key service layer.
 Business logic for API key generation, validation, and management.
 """
 
+import json
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 from datetime import datetime, timedelta
@@ -95,8 +96,6 @@ def create_api_key(
     expires_at = convert_expiry_to_datetime(expiry)
 
     # Serialize permissions as JSON string
-    import json
-
     permissions_json = json.dumps(permissions)
 
     # Create API key record
@@ -116,8 +115,6 @@ def create_api_key(
     db_api_key.key = plain_key
 
     # Parse permissions from JSON string to list for response
-    import json
-
     db_api_key.permissions = json.loads(db_api_key.permissions)
 
     return db_api_key
@@ -170,8 +167,6 @@ def validate_api_key(db: Session, key: str) -> Optional[dict]:
     db.commit()
 
     # Parse permissions from JSON
-    import json
-
     permissions = json.loads(api_key.permissions or '["read"]')
 
     result = {
