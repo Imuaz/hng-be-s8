@@ -3,6 +3,8 @@ Authentication service layer.
 Business logic for user authentication and JWT token management.
 """
 
+import hashlib
+import secrets
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 from datetime import timedelta, datetime
@@ -191,12 +193,9 @@ def create_password_reset_token(db: Session, email: str) -> str:
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
 
-    import secrets
-    import hashlib
-
     # Generate token
-    token = secrets.token_hex(32)
-    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    reset_token = secrets.token_urlsafe(32)
+    token_hash = hashlib.sha256(reset_token.encode()).hexdigest()
 
     # Store hash and expiry (15 mins)
     user.reset_token_hash = token_hash

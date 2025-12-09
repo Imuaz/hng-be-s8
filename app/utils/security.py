@@ -3,6 +3,7 @@ Security utilities for password hashing, JWT tokens, and API key generation.
 """
 
 import bcrypt
+import hashlib
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from typing import Optional
@@ -89,6 +90,4 @@ def get_key_hash(key: str) -> str:
     Returns:
         Hex digest of the hashed key
     """
-    import hashlib
-
     return hashlib.sha256(key.encode()).hexdigest()
