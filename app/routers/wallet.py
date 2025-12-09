@@ -5,7 +5,7 @@ Wallet routes for deposits, transfers, and transaction history.
 import json
 from fastapi import APIRouter, Depends, status, Request, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from app.database import get_db
 from app.schemas.wallet import (
     WalletResponse,
