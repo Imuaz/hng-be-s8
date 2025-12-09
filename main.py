@@ -52,6 +52,8 @@ app.add_middleware(
     secret_key=settings.SECRET_KEY,
     session_cookie="session",
     max_age=3600,  # 1 hour
+    same_site="lax",  # Allow cross-site for OAuth redirect
+    https_only=False,  # Set to True in production with HTTPS
 )
 
 # Include routers
