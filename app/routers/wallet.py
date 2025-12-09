@@ -40,7 +40,9 @@ async def get_balance(
     **Auth**: JWT or API key with `read` permission
     """
     wallet = get_wallet_by_user(db, auth["user_id"])
-    return {"balance": wallet.balance, "wallet_number": wallet.wallet_number}
+    # Convert balance from kobo to Naira for user-facing response
+    balance_naira = float(wallet.balance) / 100
+    return {"balance": f"{balance_naira:.2f}", "wallet_number": wallet.wallet_number}
 
 
 @router.post(
