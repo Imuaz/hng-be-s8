@@ -109,18 +109,21 @@ def get_wallet_by_number(db: Session, wallet_number: str) -> Wallet:
     return wallet
 
 
-async def initiate_deposit(db: Session, user_id: UUID, amount: Decimal) -> dict:
+async def initiate_deposit(db: Session, user_id: UUID, amount_naira: Decimal) -> dict:
     """
     Initiate a deposit using Paystack.
 
     Args:
         db: Database session
         user_id: User ID
-        amount: Amount to deposit in kobo
+        amount_naira: Amount to deposit in Naira
 
     Returns:
         Dict with reference and authorization_url
     """
+    # Convert Naira to kobo (multiply by 100)
+    amount_kobo = int(amount_naira * 100)
+
     # Get user and wallet
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
@@ -133,35 +136,35 @@ async def initiate_deposit(db: Session, user_id: UUID, amount: Decimal) -> dict:
     # Generate unique reference
     reference = f"DEP-{secrets.token_urlsafe(16)}"
 
-    # Create pending transaction
+    # Create pending transaction (store in kobo)
     transaction = Transaction(
         reference=reference,
         wallet_id=wallet.id,
-        type=TransactionType.DEPOSIT,
-        amount=amount,
-        status=TransactionStatus.PENDING,
+        type=TransactionType.DEPOSIT.value,
+        amount=Decimal(str(amount_kobo)),
+        status=TransactionStatus.PENDING.value,
         description=f"Deposit via Paystack",
-        meta_data=json.dumps({"email": user.email}),
+        meta_data=json.dumps({"email": user.email, "amount_naira": str(amount_naira)}),
     )
 
     db.add(transaction)
     db.commit()
 
-    # Initialize Paystack transaction
+    # Initialize Paystack transaction (in kobo)
     try:
         paystack_result = await PaystackService.initialize_transaction(
-            email=user.email, amount=int(amount), reference=reference
+            email=user.email, amount=amount_kobo, reference=reference
         )
 
         return {
             "reference": reference,
             "authorization_url": paystack_result["authorization_url"],
-            "amount": amount,
+            "amount": amount_naira,  # Return Naira to user
             "status": "pending",
         }
     except Exception as e:
         # Mark transaction as failed
-        transaction.status = TransactionStatus.FAILED
+        transaction.status = TransactionStatus.FAILED.value
         db.commit()
         raise
 
@@ -200,12 +203,12 @@ async def process_webhook(db: Session, payload: dict) -> bool:
         return False
 
     # Check if already processed (idempotency)
-    if transaction.status == TransactionStatus.SUCCESS:
+    if transaction.status == TransactionStatus.SUCCESS.value:
         return True  # Already processed, no-op
 
     # Verify amount matches
     if int(transaction.amount) != amount:
-        transaction.status = TransactionStatus.FAILED
+        transaction.status = TransactionStatus.FAILED.value
         transaction.meta_data = json.dumps(
             {
                 "error": "Amount mismatch",
@@ -217,7 +220,7 @@ async def process_webhook(db: Session, payload: dict) -> bool:
         return False
 
     # Update transaction status
-    transaction.status = TransactionStatus.SUCCESS
+    transaction.status = TransactionStatus.SUCCESS.value
     transaction.meta_data = json.dumps(
         {
             **json.loads(transaction.meta_data or "{}"),
@@ -237,7 +240,10 @@ async def process_webhook(db: Session, payload: dict) -> bool:
 
 
 def transfer_funds(
-    db: Session, sender_wallet_id: UUID, recipient_wallet_number: str, amount: Decimal
+    db: Session,
+    sender_wallet_id: UUID,
+    recipient_wallet_number: str,
+    amount_naira: Decimal,
 ) -> dict:
     """
     Transfer funds from one wallet to another.
@@ -247,7 +253,7 @@ def transfer_funds(
         db: Database session
         sender_wallet_id: Sender's wallet ID
         recipient_wallet_number: Recipient's wallet number
-        amount: Amount to transfer in kobo
+        amount_naira: Amount to transfer in Naira
 
     Returns:
         Dict with status and message
@@ -255,6 +261,9 @@ def transfer_funds(
     Raises:
         HTTPException: For various error conditions
     """
+    # Convert Naira to kobo
+    amount_kobo = Decimal(str(int(amount_naira * 100)))
+
     # Get sender wallet
     sender_wallet = db.query(Wallet).filter(Wallet.id == sender_wallet_id).first()
     if not sender_wallet:
@@ -272,8 +281,8 @@ def transfer_funds(
             detail="Cannot transfer to your own wallet",
         )
 
-    # Check sender balance
-    if sender_wallet.balance < amount:
+    # Check sender balance (in kobo)
+    if sender_wallet.balance < amount_kobo:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Insufficient balance"
         )
@@ -282,41 +291,43 @@ def transfer_funds(
     reference = f"TRF-{secrets.token_urlsafe(16)}"
 
     try:
-        # Create debit transaction for sender
+        # Create debit transaction for sender (in kobo)
         debit_transaction = Transaction(
             reference=f"{reference}-OUT",
             wallet_id=sender_wallet.id,
-            type=TransactionType.TRANSFER_OUT,
-            amount=amount,
-            status=TransactionStatus.SUCCESS,
+            type=TransactionType.TRANSFER_OUT.value,
+            amount=amount_kobo,
+            status=TransactionStatus.SUCCESS.value,
             description=f"Transfer to {recipient_wallet.wallet_number}",
             meta_data=json.dumps(
                 {
                     "recipient_wallet": recipient_wallet.wallet_number,
                     "recipient_user_id": str(recipient_wallet.user_id),
+                    "amount_naira": str(amount_naira),
                 }
             ),
         )
 
-        # Create credit transaction for recipient
+        # Create credit transaction for recipient (in kobo)
         credit_transaction = Transaction(
             reference=f"{reference}-IN",
             wallet_id=recipient_wallet.id,
-            type=TransactionType.TRANSFER_IN,
-            amount=amount,
-            status=TransactionStatus.SUCCESS,
+            type=TransactionType.TRANSFER_IN.value,
+            amount=amount_kobo,
+            status=TransactionStatus.SUCCESS.value,
             description=f"Transfer from {sender_wallet.wallet_number}",
             meta_data=json.dumps(
                 {
                     "sender_wallet": sender_wallet.wallet_number,
                     "sender_user_id": str(sender_wallet.user_id),
+                    "amount_naira": str(amount_naira),
                 }
             ),
         )
 
-        # Update balances
-        sender_wallet.balance -= amount
-        recipient_wallet.balance += amount
+        # Update balances (in kobo)
+        sender_wallet.balance -= amount_kobo
+        recipient_wallet.balance += amount_kobo
 
         sender_wallet.updated_at = datetime.utcnow()
         recipient_wallet.updated_at = datetime.utcnow()
@@ -384,7 +395,7 @@ async def get_deposit_status(db: Session, reference: str) -> dict:
         db.query(Transaction)
         .filter(
             Transaction.reference == reference,
-            Transaction.type == TransactionType.DEPOSIT,
+            Transaction.type == TransactionType.DEPOSIT.value,
         )
         .first()
     )
@@ -396,6 +407,6 @@ async def get_deposit_status(db: Session, reference: str) -> dict:
 
     return {
         "reference": transaction.reference,
-        "status": transaction.status.value,
+        "status": transaction.status,
         "amount": transaction.amount,
     }

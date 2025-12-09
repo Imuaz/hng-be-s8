@@ -27,16 +27,14 @@ class DepositRequest(BaseModel):
     """Schema for initiating a deposit."""
 
     amount: Decimal = Field(
-        ...,
-        gt=0,
-        description="Amount to deposit in kobo (minimum 10000 kobo = 100 NGN)",
+        ..., gt=0, description="Amount to deposit in Naira (minimum 100 NGN)"
     )
 
     @field_validator("amount")
     def validate_minimum_amount(cls, value):
-        """Paystack requires minimum 100 NGN (10000 kobo)."""
-        if value < 10000:
-            raise ValueError("Minimum deposit amount is 10000 kobo (100 NGN)")
+        """Paystack requires minimum 100 NGN."""
+        if value < 100:
+            raise ValueError("Minimum deposit amount is 100 NGN")
         return value
 
 
@@ -59,7 +57,7 @@ class TransferRequest(BaseModel):
         max_length=13,
         description="Recipient's 13-digit wallet number",
     )
-    amount: Decimal = Field(..., gt=0, description="Amount to transfer in kobo")
+    amount: Decimal = Field(..., gt=0, description="Amount to transfer in Naira")
 
 
 class TransferResponse(BaseModel):

@@ -74,10 +74,23 @@ class Transaction(Base):
     wallet_id = Column(
         Uuid(as_uuid=True), ForeignKey("wallets.id"), nullable=False, index=True
     )
-    type = Column(SQLEnum(TransactionType), nullable=False)
+    type = Column(
+        SQLEnum(
+            TransactionType,
+            native_enum=False,
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        nullable=False,
+    )
     amount = Column(Numeric(precision=15, scale=2), nullable=False)
     status = Column(
-        SQLEnum(TransactionStatus), default=TransactionStatus.PENDING, nullable=False
+        SQLEnum(
+            TransactionStatus,
+            native_enum=False,
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        default=TransactionStatus.PENDING.value,
+        nullable=False,
     )
     description = Column(String, nullable=True)
     meta_data = Column(
