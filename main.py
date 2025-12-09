@@ -37,23 +37,23 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# Configure CORS
+# Add session middleware FIRST (middleware applied in reverse order)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.SECRET_KEY,
+    session_cookie="session",
+    max_age=3600,
+    same_site="lax",
+    https_only=False,
+)
+
+# Configure CORS AFTER session middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-)
-
-# Add session middleware for Google OAuth
-app.add_middleware(
-    SessionMiddleware,
-    secret_key=settings.SECRET_KEY,
-    session_cookie="session",
-    max_age=3600,  # 1 hour
-    same_site="lax",  # Allow cross-site for OAuth redirect
-    https_only=False,  # Set to True in production with HTTPS
 )
 
 # Include routers
