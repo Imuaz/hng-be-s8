@@ -5,6 +5,7 @@ Authentication + API Key Service for service-to-service and user authentication.
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 from contextlib import asynccontextmanager
 from app.config import settings
 from app.database import engine, Base
@@ -43,6 +44,14 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+# Add session middleware for Google OAuth
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.SECRET_KEY,
+    session_cookie="session",
+    max_age=3600,  # 1 hour
 )
 
 # Include routers
