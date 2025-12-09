@@ -23,11 +23,9 @@ from app.services.auth import (
     reset_password,
 )
 from app.services.google_oauth import oauth
-from app.dependencies.auth import get_current_user
 from app.config import settings
 from app.models.auth import User
 from app.services.wallet import create_wallet
-from uuid import UUID
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 security = HTTPBearer()
