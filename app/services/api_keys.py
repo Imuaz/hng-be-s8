@@ -196,7 +196,6 @@ def list_user_api_keys(db: Session, user_id: UUID) -> List[APIKey]:
     Returns:
         List of API key objects
     """
-    import json
 
     api_keys = db.query(APIKey).filter(APIKey.user_id == user_id).all()
 

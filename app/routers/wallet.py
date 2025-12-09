@@ -2,6 +2,7 @@
 Wallet routes for deposits, transfers, and transaction history.
 """
 
+import json
 from fastapi import APIRouter, Depends, status, Request, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
@@ -89,8 +90,6 @@ async def paystack_webhook(request: Request, db: Session = Depends(get_db)):
         )
 
     # Parse payload
-    import json
-
     payload = json.loads(body)
 
     # Process webhook
