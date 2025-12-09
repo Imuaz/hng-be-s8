@@ -143,21 +143,28 @@ async def create_transfer(
 
 
 @router.get("/transactions", response_model=List[TransactionResponse])
-async def list_transactions(
-    limit: int = 50,
-    offset: int = 0,
+async def get_transactions(
+    transaction_type: Optional[str] = None,
+    page: int = 1,
+    limit: int = 20,
     auth: dict = Depends(require_permission("read")),
     db: Session = Depends(get_db),
 ):
     """
-    Get transaction history.
+    Get transaction history with pagination.
 
     **Auth**: JWT or API key with `read` permission
 
-    **Query Parameters**:
-    - `limit`: Max transactions to return (default: 50)
-    - `offset`: Number of transactions to skip (default: 0)
+    **Params**:
+    - transaction_type: Optional filter (deposit, transfer_in, transfer_out)
+    - page: Page number (default: 1)
+    - limit: Items per page (default: 20, max: 100)
     """
-    wallet = get_wallet_by_user(db, auth["user_id"])
-    transactions = get_transactions(db, wallet.id, limit, offset)
+    transactions = get_transaction_history(
+        db, auth["user_id"], transaction_type, page, limit
+    )
+    # Convert amounts from kobo to Naira for display
+    for txn in transactions:
+        txn.amount = float(txn.amount) / 100
     return transactions
+```
