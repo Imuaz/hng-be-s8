@@ -55,7 +55,7 @@ A production-ready backend wallet service built with FastAPI, featuring Google O
 ### 1. Clone Repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/hng-be-s8.git
+git clone https://github.com/Imuaz/hng-be-s8.git
 cd hng-be-s8
 ```
 
@@ -240,33 +240,6 @@ curl http://localhost:8000/wallet/transactions?limit=20&offset=0 \
 3. Add authorized redirect URI: `http://localhost:8000/auth/google/callback`
 4. Copy Client ID and Client Secret to `.env`
 
-## 🚀 Deployment
-
-### Railway (Recommended)
-
-```bash
-# Push to GitHub
-git push origin main
-
-# Deploy on Railway
-# 1. Visit railway.app
-# 2. New Project → Deploy from GitHub
-# 3. Add PostgreSQL database
-# 4. Set environment variables
-# 5. Deploy automatically
-```
-
-See [deployment_guide.md](docs/deployment_guide.md) for detailed instructions.
-
-### Docker (Alternative)
-
-```bash
-# Build image
-docker build -t wallet-service .
-
-# Run container
-docker run -p 8000:8000 --env-file .env wallet-service
-```
 
 ## 🧪 Testing
 
@@ -353,8 +326,8 @@ This project is licensed under the MIT License.
 
 ## 👤 Author
 
-**Your Name**
-- GitHub: [@yourusername](https://github.com/yourusername)
+**Imuaz**
+- GitHub: [@Imuaz](https://github.com/Imuaz)
 
 ## 🙏 Acknowledgments
 
@@ -364,7 +337,7 @@ This project is licensed under the MIT License.
 
 ## 📞 Support
 
-For support, email your-email@example.com or open an issue.
+For support, email me or open an issue.
 
 ---
 
