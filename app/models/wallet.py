@@ -80,7 +80,9 @@ class Transaction(Base):
         SQLEnum(TransactionStatus), default=TransactionStatus.PENDING, nullable=False
     )
     description = Column(String, nullable=True)
-    metadata = Column(String, nullable=True)  # JSON as string
+    meta_data = Column(
+        String, nullable=True
+    )  # JSON as string (renamed from metadata to avoid SQLAlchemy conflict)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False

@@ -115,6 +115,11 @@ def create_api_key(
     # Attach plain key to object for one-time display (not persisted)
     db_api_key.key = plain_key
 
+    # Parse permissions from JSON string to list for response
+    import json
+
+    db_api_key.permissions = json.loads(db_api_key.permissions)
+
     return db_api_key
 
 
@@ -196,7 +201,15 @@ def list_user_api_keys(db: Session, user_id: UUID) -> List[APIKey]:
     Returns:
         List of API key objects
     """
-    return db.query(APIKey).filter(APIKey.user_id == user_id).all()
+    import json
+
+    api_keys = db.query(APIKey).filter(APIKey.user_id == user_id).all()
+
+    # Parse permissions from JSON strings to lists
+    for key in api_keys:
+        key.permissions = json.loads(key.permissions or '["read"]')
+
+    return api_keys
 
 
 def revoke_api_key(db: Session, key_id: UUID, user_id: UUID) -> APIKey:
@@ -343,4 +356,5 @@ def rollover_api_key(
         expiry=expiry,
     )
 
+    # Permissions are already parsed in create_api_key
     return new_key

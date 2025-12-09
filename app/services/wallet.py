@@ -141,7 +141,7 @@ async def initiate_deposit(db: Session, user_id: UUID, amount: Decimal) -> dict:
         amount=amount,
         status=TransactionStatus.PENDING,
         description=f"Deposit via Paystack",
-        metadata=json.dumps({"email": user.email}),
+        meta_data=json.dumps({"email": user.email}),
     )
 
     db.add(transaction)
@@ -206,7 +206,7 @@ async def process_webhook(db: Session, payload: dict) -> bool:
     # Verify amount matches
     if int(transaction.amount) != amount:
         transaction.status = TransactionStatus.FAILED
-        transaction.metadata = json.dumps(
+        transaction.meta_data = json.dumps(
             {
                 "error": "Amount mismatch",
                 "expected": str(transaction.amount),
@@ -218,9 +218,9 @@ async def process_webhook(db: Session, payload: dict) -> bool:
 
     # Update transaction status
     transaction.status = TransactionStatus.SUCCESS
-    transaction.metadata = json.dumps(
+    transaction.meta_data = json.dumps(
         {
-            **json.loads(transaction.metadata or "{}"),
+            **json.loads(transaction.meta_data or "{}"),
             "paystack_reference": data.get("id"),
             "processed_at": datetime.utcnow().isoformat(),
         }
@@ -290,7 +290,7 @@ def transfer_funds(
             amount=amount,
             status=TransactionStatus.SUCCESS,
             description=f"Transfer to {recipient_wallet.wallet_number}",
-            metadata=json.dumps(
+            meta_data=json.dumps(
                 {
                     "recipient_wallet": recipient_wallet.wallet_number,
                     "recipient_user_id": str(recipient_wallet.user_id),
@@ -306,7 +306,7 @@ def transfer_funds(
             amount=amount,
             status=TransactionStatus.SUCCESS,
             description=f"Transfer from {sender_wallet.wallet_number}",
-            metadata=json.dumps(
+            meta_data=json.dumps(
                 {
                     "sender_wallet": sender_wallet.wallet_number,
                     "sender_user_id": str(sender_wallet.user_id),

@@ -85,7 +85,7 @@ def upgrade() -> None:
             server_default="pending",
         ),
         sa.Column("description", sa.String(), nullable=True),
-        sa.Column("metadata", sa.String(), nullable=True),
+        sa.Column("meta_data", sa.String(), nullable=True),
         sa.Column(
             "created_at", sa.DateTime(), nullable=False, server_default=sa.text("now()")
         ),
