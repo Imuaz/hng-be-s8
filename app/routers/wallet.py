@@ -167,4 +167,3 @@ async def get_transactions(
     for txn in transactions:
         txn.amount = float(txn.amount) / 100
     return transactions
-```
