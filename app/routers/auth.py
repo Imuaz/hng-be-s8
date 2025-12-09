@@ -135,9 +135,17 @@ async def google_login(request: Request):
     """
     Initiate Google OAuth sign-in.
     Redirects user to Google consent screen.
+
+    **Requirements**: Google OAuth must be configured in .env
     """
-    redirect_uri = settings.GOOGLE_REDIRECT_URI
-    return await oauth.google.authorize_redirect(request, redirect_uri)
+    try:
+        redirect_uri = settings.GOOGLE_REDIRECT_URI
+        return await oauth.google.authorize_redirect(request, redirect_uri)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Google OAuth not configured or unavailable. Please configure GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REDIRECT_URI in .env. Error: {str(e)}",
+        )
 
 
 @router.get("/google/callback", response_model=Token, tags=["Google OAuth"])
