@@ -43,7 +43,6 @@ class PaystackService:
             "email": email,
             "amount": str(amount),  # Paystack expects string
             "reference": reference,
-            "callback_url": f"{settings.GOOGLE_REDIRECT_URI.replace('/auth/google/callback', '/wallet/deposit/callback')}",
         }
 
         async with httpx.AsyncClient() as client:
