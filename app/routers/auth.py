@@ -1,16 +1,15 @@
 """
-Authentication routes for user signup and login.
+Authentication router for user login, signup, password reset, and Google OAuth.
 """
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.schemas.auth import (
     UserSignup,
     UserLogin,
+    TokenResponse,
     UserResponse,
-    Token,
-    Logout,
     ForgotPasswordRequest,
     ResetPasswordRequest,
 )
@@ -19,10 +18,16 @@ from app.services.auth import (
     authenticate_user,
     create_user_token,
     blacklist_token,
+    is_token_blacklisted,
     create_password_reset_token,
     reset_password,
 )
-from app.dependencies.rate_limit import RateLimiter
+from app.services.google_oauth import oauth
+from app.dependencies.auth import get_current_user
+from app.config import settings
+from app.models.auth import User
+from app.services.wallet import create_wallet
+from uuid import UUID
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 security = HTTPBearer()
@@ -127,3 +132,79 @@ async def reset_password_endpoint(
     """
     reset_password(db, request.token, request.new_password)
     return {"message": "Password successfully reset"}
+
+
+@router.get("/google", tags=["Google OAuth"])
+async def google_login(request: Request):
+    """
+    Initiate Google OAuth sign-in.
+    Redirects user to Google consent screen.
+    """
+    redirect_uri = settings.GOOGLE_REDIRECT_URI
+    return await oauth.google.authorize_redirect(request, redirect_uri)
+
+
+@router.get("/google/callback", response_model=TokenResponse, tags=["Google OAuth"])
+async def google_callback(request: Request, db: Session = Depends(get_db)):
+    """
+    Handle Google OAuth callback.
+    Creates or logs in user and returns JWT token.
+    """
+    try:
+        # Get access token from Google
+        token = await oauth.google.authorize_access_token(request)
+
+        # Get user info from Google
+        user_info = token.get("userinfo")
+        if not user_info:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to get user info from Google",
+            )
+
+        google_id = user_info.get("sub")
+        email = user_info.get("email")
+        name = user_info.get("name", email.split("@")[0])
+
+        if not google_id or not email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Missing required user information",
+            )
+
+        # Check if user exists by google_id
+        user = db.query(User).filter(User.google_id == google_id).first()
+
+        if not user:
+            # Check if email already exists (user signed up with username/password)
+            user = db.query(User).filter(User.email == email).first()
+            if user:
+                # Link Google account to existing user
+                user.google_id = google_id
+                db.commit()
+            else:
+                # Create new user
+                user = User(
+                    email=email,
+                    username=name,
+                    google_id=google_id,
+                    hashed_password=None,  # No password for Google users
+                    is_active=True,
+                )
+                db.add(user)
+                db.commit()
+                db.refresh(user)
+
+                # Auto-create wallet
+                create_wallet(db, user.id)
+
+        # Generate JWT token
+        access_token = create_user_token(user)
+
+        return {"access_token": access_token, "token_type": "bearer"}
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Google OAuth failed: {str(e)}",
+        )
