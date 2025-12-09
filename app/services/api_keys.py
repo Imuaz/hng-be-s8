@@ -332,8 +332,6 @@ def rollover_api_key(
         )
 
     # Get permissions from the expired key
-    import json
-
     permissions = json.loads(expired_key.permissions or '["read"]')
 
     # Create new key with same permissions but new name
