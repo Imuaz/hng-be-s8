@@ -130,7 +130,7 @@ async def reset_password_endpoint(
     return {"message": "Password successfully reset"}
 
 
-@router.get("/google", tags=["Google OAuth"])
+@router.get("/google")
 async def google_login(request: Request):
     """
     Initiate Google OAuth sign-in.
@@ -148,7 +148,7 @@ async def google_login(request: Request):
         )
 
 
-@router.get("/google/callback", response_model=Token, tags=["Google OAuth"])
+@router.get("/google/callback", response_model=Token)
 async def google_callback(request: Request, db: Session = Depends(get_db)):
     """
     Handle Google OAuth callback.
