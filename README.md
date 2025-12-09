@@ -1,287 +1,371 @@
-# Authentication + API Key Service
+# Wallet Service with Paystack, JWT & API Keys
 
-> **HNG Stage 7 - Task 3:** Mini Authentication + API Key System for Service-to-Service Access
+A production-ready backend wallet service built with FastAPI, featuring Google OAuth authentication, API key management, Paystack payment integration, and wallet-to-wallet transfers.
 
-A production-ready FastAPI application implementing **dual authentication** with JWT tokens for user access and API keys for service-to-service communication.
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.104.1-009688.svg)](https://fastapi.tiangolo.com)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791.svg)](https://www.postgresql.org/)
 
-## 🎯 Features
+## 🚀 Features
 
--  **User Authentication**: JWT-based signup/login system
-- 🔐 **API Key Management**: Create, list, and revoke API keys
-- 🔄 **Dual Authentication**: Support for both JWT tokens and API keys
-- 🛡️ **Secure**: Password hashing with bcrypt, JWT with expiration
-- 🗄️ **PostgreSQL**: Production-ready database
-- ✅ **100% Test Coverage**: Comprehensive test suite
-- 📚 **Auto-generated API Docs**: Interactive Swagger UI at `/docs`
+- **Dual Authentication**
+  - Google OAuth 2.0 sign-in with JWT tokens
+  - Username/password authentication (backup)
+  
+- **API Key Management**
+  - Permission-based access (deposit, transfer, read)
+  - Flexible expiry formats (1H, 1D, 1M, 1Y)
+  - Maximum 5 active keys per user
+  - API key rollover for expired keys
+
+- **Wallet Operations**
+  - Automatic wallet creation on user registration
+  - Unique 13-digit wallet numbers
+  - Real-time balance tracking
+  - Transaction history with pagination
+
+- **Paystack Integration**
+  - Deposit initialization with payment links
+  - **Mandatory webhook handling** for automatic crediting
+  - Webhook signature validation
+  - Idempotent transaction processing
+
+- **Wallet Transfers**
+  - Atomic wallet-to-wallet transfers
+  - Balance validation
+  - Self-transfer prevention
+  - Dual transaction recording (OUT/IN)
+
+- **Security**
+  - HMAC-SHA512 webhook signature verification
+  - bcrypt password hashing
+  - JWT token-based authentication
+  - API key permission enforcement
+  - CORS configuration
 
 ## 📋 Requirements
 
-- Python 3.10+
-- PostgreSQL database
-- pip (Python package manager)
+- Python 3.12+
+- PostgreSQL 14+
+- Paystack account (test/live keys)
+- Google OAuth credentials (optional)
 
-## 🚀 Quick Start
+## 🛠️ Installation
 
-### 1. Clone and Setup
+### 1. Clone Repository
 
 ```bash
-cd path/to/your/project directory
-python -m venv venv
+git clone https://github.com/YOUR_USERNAME/hng-be-s8.git
+cd hng-be-s8
+```
+
+### 2. Create Virtual Environment
+
+```bash
+python3.12 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+### 3. Install Dependencies
+
+```bash
 pip install -r requirements.txt
 ```
 
-### 2. Configure Database
-
-Create a PostgreSQL database:
-
-```bash
-# Using psql
-createdb <database name>
-
-# Or using SQL
-psql -U postgres
-CREATE DATABASE <database name>;
-```
-
-### 3. Environment Configuration
-
-Create a `.env` file (copy from `.env.example`):
+### 4. Configure Environment Variables
 
 ```bash
 cp .env.example .env
+# Edit .env with your credentials
 ```
 
-Edit `.env` with your settings:
+**Required variables:**
+```bash
+DATABASE_URL=postgresql://user:password@localhost:5432/wallet_db
+SECRET_KEY=your-secret-key-minimum-32-characters
+PAYSTACK_SECRET_KEY=sk_test_your_paystack_secret
+PAYSTACK_PUBLIC_KEY=pk_test_your_paystack_public
 
-```env
-DATABASE_URL=postgresql://<db_username>:<db_password>@localhost:5432/<database_name>
-SECRET_KEY=your-super-secret-key-min-32-characters
-ACCESS_TOKEN_EXPIRE_MINUTES= # set the access token expiration time in minutes
-API_KEY_EXPIRE_DAYS= # set the API key expiration time in days
+# Optional (for Google OAuth)
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+GOOGLE_REDIRECT_URI=http://localhost:8000/auth/google/callback
 ```
 
-### 4. Run the Application
+### 5. Setup Database
 
 ```bash
-# Development mode with auto-reload
-uvicorn main:app --reload
+# Create database
+createdb wallet_db
 
-# Production mode
-uvicorn main:app --host 0.0.0.0 --port 8000
+# Run migrations
+alembic upgrade head
 ```
 
-The API will be available at `http://localhost:8000`
+### 6. Run Server
 
-## 📖 API Documentation
+```bash
+uvicorn main:app --reload
+```
 
-Interactive API documentation is available at:
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
+Server runs at: http://localhost:8000
 
-## 🔑 API Endpoints
+API Documentation: http://localhost:8000/docs
+
+## 📚 API Endpoints
 
 ### Authentication
 
-#### **POST** `/auth/signup`
-Register a new user account.
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/auth/google` | Initiate Google OAuth | None |
+| GET | `/auth/google/callback` | OAuth callback, returns JWT | None |
+| POST | `/auth/signup` | Create account | None |
+| POST | `/auth/login` | Login, returns JWT | None |
+
+### API Keys
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| POST | `/keys/create` | Create API key | JWT |
+| POST | `/keys/rollover` | Rollover expired key | JWT |
+| GET | `/keys` | List user's API keys | JWT |
+| DELETE | `/keys/{key_id}` | Revoke API key | JWT |
+
+### Wallet Operations
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/wallet/balance` | Get wallet balance | JWT or API key (read) |
+| POST | `/wallet/deposit` | Initialize Paystack deposit | JWT or API key (deposit) |
+| POST | `/wallet/paystack/webhook` | Paystack webhook handler | Webhook signature |
+| GET | `/wallet/deposit/{ref}/status` | Check deposit status | JWT or API key (read) |
+| POST | `/wallet/transfer` | Transfer to another wallet | JWT or API key (transfer) |
+| GET | `/wallet/transactions` | Transaction history | JWT or API key (read) |
+
+## 🔐 Authentication
+
+### Using JWT (User Authentication)
 
 ```bash
-curl -X POST http://localhost:8000/auth/signup \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "user@example.com",
-    "username": "myusername",
-    "password": "securepass123"
-  }'
-```
-
-#### **POST** `/auth/login`
-Login and receive a JWT access token.
-
-```bash
+# 1. Login
 curl -X POST http://localhost:8000/auth/login \
   -H "Content-Type: application/json" \
-  -d '{
-    "username": "myusername",
-    "password": "securepass123"
-  }'
+  -d '{"username":"user","password":"pass"}'
+
+# Response: {"access_token": "eyJ...", "token_type": "bearer"}
+
+# 2. Use token
+curl http://localhost:8000/wallet/balance \
+  -H "Authorization: Bearer eyJ..."
 ```
 
-Response:
-```json
-{
-  "access_token": "eyJhbGciOiJIUzI1NiIs...",
-  "token_type": "bearer"
-}
-```
-
-### API Key Management
-
-#### **POST** `/keys/create`
-Create a new API key (requires JWT authentication).
+### Using API Keys (Service Access)
 
 ```bash
+# 1. Create API key
 curl -X POST http://localhost:8000/keys/create \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Authorization: Bearer YOUR_JWT" \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "My Service Key",
-    "expires_in_days": 365
+    "name": "wallet-service",
+    "permissions": ["deposit", "transfer", "read"],
+    "expiry": "1M"
+  }'
+
+# Response: {"api_key": "sk_...", "expires_at": "..."}
+
+# 2. Use API key
+curl http://localhost:8000/wallet/balance \
+  -H "x-api-key: sk_..."
+```
+
+## 💰 Usage Examples
+
+### Make a Deposit
+
+```bash
+# Initialize deposit
+curl -X POST http://localhost:8000/wallet/deposit \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"amount": 5000}'
+
+# Response includes Paystack payment link
+{
+  "reference": "DEP-xxxxx",
+  "authorization_url": "https://checkout.paystack.com/xxxxx",
+  "access_code": "xxxxx"
+}
+
+# User completes payment → Paystack sends webhook → Wallet credited automatically
+```
+
+### Transfer Funds
+
+```bash
+curl -X POST http://localhost:8000/wallet/transfer \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "wallet_number": "1234567890123",
+    "amount": 1000
   }'
 ```
 
-Response:
-```json
-{
-  "id": 1,
-  "key": "sk_Ab3D...xyz",
-  "name": "My Service Key",
-  "created_at": "2025-12-05T23:00:00",
-  "expires_at": "2026-12-05T23:00:00",
-  "is_revoked": false
-}
-```
-
-⚠️ **Important**: Save the `key` value immediately - it won't be shown again!
-
-#### **GET** `/keys`
-List all your API keys.
+### View Transaction History
 
 ```bash
-curl -X GET http://localhost:8000/keys \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+curl http://localhost:8000/wallet/transactions?limit=20&offset=0 \
+  -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
-#### **DELETE** `/keys/{key_id}`
-Revoke an API key.
+## 🔧 Configuration
+
+### Paystack Webhook Setup
+
+1. Go to [Paystack Dashboard](https://dashboard.paystack.com/settings/webhooks)
+2. Set webhook URL: `https://your-domain.com/wallet/paystack/webhook`
+3. Select events: **All Events** or **Successful Payment**
+4. Save
+
+**For local testing:**
+- Use [ngrok](https://ngrok.com/): `ngrok http 8000`
+- Update webhook to: `https://your-ngrok-url.ngrok.io/wallet/paystack/webhook`
+
+### Google OAuth Setup
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create OAuth 2.0 credentials
+3. Add authorized redirect URI: `http://localhost:8000/auth/google/callback`
+4. Copy Client ID and Client Secret to `.env`
+
+## 🚀 Deployment
+
+### Railway (Recommended)
 
 ```bash
-curl -X DELETE http://localhost:8000/keys/1 \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+# Push to GitHub
+git push origin main
+
+# Deploy on Railway
+# 1. Visit railway.app
+# 2. New Project → Deploy from GitHub
+# 3. Add PostgreSQL database
+# 4. Set environment variables
+# 5. Deploy automatically
 ```
 
-### Protected Routes (Demo)
+See [deployment_guide.md](docs/deployment_guide.md) for detailed instructions.
 
-#### **GET** `/protected/user`
-Accessible **only** with JWT token.
+### Docker (Alternative)
 
 ```bash
-curl -X GET http://localhost:8000/protected/user \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+# Build image
+docker build -t wallet-service .
+
+# Run container
+docker run -p 8000:8000 --env-file .env wallet-service
 ```
 
-#### **GET** `/protected/service`
-Accessible **only** with API key.
+## 🧪 Testing
+
+### Run Tests
 
 ```bash
-curl -X GET http://localhost:8000/protected/service \
-  -H "x-api-key: YOUR_API_KEY"
+pytest
 ```
 
-#### **GET** `/protected/any`
-Accessible with **either** JWT token **or** API key.
+### Manual Testing
 
-```bash
-# With JWT
-curl -X GET http://localhost:8000/protected/any \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+Use Swagger UI at http://localhost:8000/docs
 
-# With API key
-curl -X GET http://localhost:8000/protected/any \
-  -H "x-api-key: YOUR_API_KEY"
-```
-
-## 🧪 Running Tests
-
-```bash
-# Run all tests
-pytest -v
-
-# Run with coverage
-pytest --cov=app tests/
-
-# Run specific test file
-pytest tests/test_auth.py -v
-```
-
-## 🏗️ Project Structure
+### Test with Paystack Test Cards
 
 ```
-hng-be-s7/
+Card Number: 4084084084084081
+CVV: 408
+Expiry: Any future date
+PIN: 0000
+OTP: 123456
+```
+
+## 📁 Project Structure
+
+```
+hng-be-s8/
 ├── app/
-│   ├── config.py              # Environment configuration
-│   ├── database.py            # Database setup and session
-│   ├── models/
-│   │   └── auth.py            # SQLAlchemy models
-│   ├── schemas/
-│   │   └── auth.py            # Pydantic schemas
-│   ├── services/
-│   │   ├── auth.py            # Authentication business logic
-│   │   └── api_keys.py        # API key management logic
-│   ├── dependencies/
-│   │   └── auth.py            # Auth dependencies
-│   ├── routers/
-│   │   ├── auth.py            # Auth endpoints
-│   │   ├── api_keys.py        # API key endpoints
-│   │   └── protected.py       # Protected demo routes
-│   └── utils/
-│       └── security.py        # Security utilities
-├── tests/
-│   ├── conftest.py            # Pytest fixtures
-│   ├── test_auth.py           # Auth endpoint tests
-│   ├── test_api_keys.py       # API key tests
-│   └── test_protected.py      # Protected route tests
-├── main.py                    # FastAPI application
-├── requirements.txt           # Python dependencies
-├── .env.example               # Environment template
-└── README.md                  # This file
+│   ├── dependencies/     # Auth dependencies
+│   ├── models/          # SQLAlchemy models
+│   ├── routers/         # API endpoints
+│   ├── schemas/         # Pydantic schemas
+│   ├── services/        # Business logic
+│   ├── utils/           # Helper functions
+│   ├── config.py        # Configuration
+│   └── database.py      # Database setup
+├── migrations/          # Alembic migrations
+├── main.py             # FastAPI application
+├── requirements.txt    # Python dependencies
+├── .env.example        # Environment template
+├── Procfile           # Railway/Heroku config
+└── README.md          # This file
 ```
-
-## 🔐 Authentication Flow
-
-### User Authentication (JWT)
-1. User signs up via `/auth/signup`
-2. User logs in via `/auth/login` and receives a JWT token
-3. Include token in requests: `Authorization: Bearer <token>`
-4. Token expires after 30 minutes (configurable)
-
-### Service Authentication (API Key)
-1. User creates API key via `/keys/create` (requires JWT)
-2. Use API key in requests: `x-api-key: <key>`
-3. API key expires after 365 days (configurable)
-4. Keys can be revoked anytime via `/keys/{key_id}`
 
 ## 🛡️ Security Features
 
 - ✅ Password hashing with bcrypt
-- ✅ JWT tokens with configurable expiration
-- ✅ API key expiration and revocation
-- ✅ Protected routes with flexible authentication
-- ✅ CORS middleware configured
-- ✅ Input validation with Pydantic
-- ✅ SQL injection protection via SQLAlchemy ORM
+- ✅ JWT token authentication
+- ✅ API key permission validation
+- ✅ Webhook signature verification (HMAC-SHA512)
+- ✅ CORS configuration
+- ✅ SQL injection protection (SQLAlchemy)
+- ✅ Environment variable secrets
+- ✅ Idempotent webhook processing
+- ✅ Atomic database transactions
 
-## 🔧 Configuration
+## 📝 API Key Permissions
 
-Key environment variables in `.env`:
+- **read**: View balance, transactions
+- **deposit**: Initialize deposits
+- **transfer**: Transfer funds
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | Required |
-| `SECRET_KEY` | JWT signing key (min 32 chars) | Required |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | JWT token lifetime | 30 |
-| `API_KEY_EXPIRE_DAYS` | API key lifetime | 365 |
-| `CORS_ORIGINS` | Allowed CORS origins | localhost |
+## ⚙️ Technical Stack
 
-## 📝 License
+- **Framework**: FastAPI 0.104.1
+- **Database**: PostgreSQL with SQLAlchemy
+- **Authentication**: JWT (PyJWT), OAuth (Authlib)
+- **Payments**: Paystack API
+- **Password Hashing**: bcrypt
+- **Migrations**: Alembic
+- **ASGI Server**: Uvicorn
 
-MIT License - feel free to use this for your projects!
+## 🤝 Contributing
 
-## 👨‍💻 Author
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
-- [I Muaz](https://github.com/imuaz) - Built for HNG Stage 7 Task 3
+## 📄 License
+
+This project is licensed under the MIT License.
+
+## 👤 Author
+
+**Your Name**
+- GitHub: [@yourusername](https://github.com/yourusername)
+
+## 🙏 Acknowledgments
+
+- [FastAPI](https://fastapi.tiangolo.com/) - Modern web framework
+- [Paystack](https://paystack.com/) - Payment infrastructure
+- [HNG Internship](https://hng.tech/) - Project requirements
+
+## 📞 Support
+
+For support, email your-email@example.com or open an issue.
 
 ---
 
-**Happy Coding!** 🚀
+**Built with ❤️ for HNG Internship Stage 8**
