@@ -30,10 +30,6 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 security = HTTPBearer()
 
-# Rate limiters
-signup_limiter = RateLimiter(requests_limit=10, time_window=60)
-login_limiter = RateLimiter(requests_limit=5, time_window=60)
-
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
@@ -41,7 +37,6 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
     "/signup",
     response_model=UserResponse,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(signup_limiter)],
 )
 async def signup(user_data: UserSignup, db: Session = Depends(get_db)):
     """
@@ -62,7 +57,10 @@ async def signup(user_data: UserSignup, db: Session = Depends(get_db)):
     return user
 
 
-@router.post("/login", response_model=Token, dependencies=[Depends(login_limiter)])
+@router.post(
+    "/login",
+    response_model=Token,
+)
 async def login(user_data: UserLogin, db: Session = Depends(get_db)):
     """
     Login with username and password to receive a JWT access token.
