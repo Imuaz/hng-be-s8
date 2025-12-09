@@ -8,7 +8,7 @@ from app.database import get_db
 from app.schemas.auth import (
     UserSignup,
     UserLogin,
-    TokenResponse,
+    Token,
     UserResponse,
     ForgotPasswordRequest,
     ResetPasswordRequest,
@@ -144,7 +144,7 @@ async def google_login(request: Request):
     return await oauth.google.authorize_redirect(request, redirect_uri)
 
 
-@router.get("/google/callback", response_model=TokenResponse, tags=["Google OAuth"])
+@router.get("/google/callback", response_model=Token, tags=["Google OAuth"])
 async def google_callback(request: Request, db: Session = Depends(get_db)):
     """
     Handle Google OAuth callback.
