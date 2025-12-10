@@ -299,7 +299,7 @@ def transfer_funds(
                 {
                     "recipient_wallet": recipient_wallet.wallet_number,
                     "recipient_user_id": str(recipient_wallet.user_id),
-                    "amount_naira": str(amount_naira),
+                    "amount_kobo": str(amount_kobo),
                 }
             ),
         )
@@ -316,7 +316,7 @@ def transfer_funds(
                 {
                     "sender_wallet": sender_wallet.wallet_number,
                     "sender_user_id": str(sender_wallet.user_id),
-                    "amount_naira": str(amount_naira),
+                    "amount_kobo": str(amount_kobo),
                 }
             ),
         )
