@@ -1,4 +1,4 @@
-export APP_URL='https://hng-be-s8-production.up.railway.app/'
+export APP_URL='https:/YOUR-APP-NAME.up.railway.app/'
 
 echo "🔍 Quick Endpoint Test"
 echo "Testing: $APP_URL"
