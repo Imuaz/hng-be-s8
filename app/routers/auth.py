@@ -134,6 +134,14 @@ async def google_login(request: Request):
     Initiate Google OAuth sign-in.
     Redirects user to Google consent screen.
 
+    ⚠️ **CANNOT TEST IN SWAGGER UI** - Must test in browser!
+
+    **Testing Instructions:**
+    - Visit this URL in a browser: `https://hng-be-s8-production.up.railway.app/auth/google`
+    - You'll be redirected to Google sign-in
+    - After signing in,google will automatically call this `/auth/google/callback`
+    - You'll receive a JWT token
+
     **Requirements**: Google OAuth must be configured in .env
     """
     try:
@@ -150,7 +158,24 @@ async def google_login(request: Request):
 async def google_callback(request: Request, db: Session = Depends(get_db)):
     """
     Handle Google OAuth callback.
-    Creates or logs in user and returns JWT token.
+    Called by Google after successful authentication.
+    Creates user if not existing, auto-creates wallet.
+
+    ⚠️ **CANNOT TEST IN SWAGGER UI** - This is an OAuth callback!
+
+    **Testing Instructions:**
+    - This endpoint is automatically called by Google after sign-in
+    - Test by completing the full OAuth flow from `/auth/google`
+    - Google will redirect here with authentication code
+    - Do NOT call this endpoint directly
+
+    **Response**:
+    - JWT token on success
+    - Error message on failure
+
+    **Creates**:
+    - New user (if email doesn't exist)
+    - Wallet for new users automatically
     """
     try:
         # Get access token from Google

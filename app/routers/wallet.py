@@ -75,6 +75,25 @@ async def paystack_webhook(request: Request, db: Session = Depends(get_db)):
     """
     Handle Paystack webhooks (MANDATORY for crediting wallets).
 
+    ⚠️ **CANNOT TEST IN SWAGGER UI** - Called by Paystack servers only!
+
+    **Testing Instructions:**
+    1. Configure webhook in Paystack Dashboard:
+       - URL: `https://hng-be-s8-production.up.railway.app/wallet/paystack/webhook`
+       - Event: "Successful Payment" or "All Events"
+    2. Make a real test payment via `/wallet/deposit`
+    3. Complete payment on Paystack checkout page
+    4. Paystack will automatically call this webhook
+    5. Wallet will be credited automatically
+
+    **Manual Test (Signature Validation):**
+    ```bash
+    curl -X POST https://hng-be-s8-production.up.railway.app/wallet/paystack/webhook \
+      -H "Content-Type: application/json" \
+      -d '{"event":"charge.success"}'
+    # Should return 401 (signature validation working)
+    ```
+
     **No authentication required** - validates via Paystack signature.
 
     **Security**: Verifies X-Paystack-Signature header
