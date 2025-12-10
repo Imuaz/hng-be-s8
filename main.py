@@ -108,6 +108,30 @@ def custom_openapi():
         },
     }
 
+    # Apply security to all paths except public ones
+    public_paths = [
+        "/",
+        "/health",
+        "/docs",
+        "/redoc",
+        "/openapi.json",
+        "/auth/google",
+        "/auth/google/callback",
+        "/auth/signup",
+        "/auth/login",
+    ]
+
+    for path, path_item in openapi_schema.get("paths", {}).items():
+        # Skip public endpoints
+        if path in public_paths:
+            continue
+
+        # Apply security to all methods in this path
+        for method in path_item:
+            if method in ["get", "post", "put", "delete", "patch"]:
+                # Add both auth methods as alternatives (user can use either)
+                path_item[method]["security"] = [{"BearerAuth": []}, {"ApiKeyAuth": []}]
+
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 
