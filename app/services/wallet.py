@@ -109,57 +109,53 @@ def get_wallet_by_number(db: Session, wallet_number: str) -> Wallet:
     return wallet
 
 
-async def initiate_deposit(db: Session, user_id: UUID, amount_naira: Decimal) -> dict:
+async def initiate_deposit(db: Session, user_id: UUID, amount_kobo: int) -> dict:
     """
     Initiate a deposit using Paystack.
 
     Args:
         db: Database session
         user_id: User ID
-        amount_naira: Amount to deposit in Naira
+        amount_kobo: Amount to deposit in kobo (e.g., 10000 = NGN 100)
 
     Returns:
         Dict with reference and authorization_url
     """
-    # Convert Naira to kobo (multiply by 100)
-    amount_kobo = int(amount_naira * 100)
+    # Amount is already in kobo from API, no conversion needed
+    # Paystack expects kobo (smallest currency unit)
 
-    # Get user and wallet
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
-
+    # Get user's wallet
     wallet = get_wallet_by_user(db, user_id)
 
     # Generate unique reference
     reference = f"DEP-{secrets.token_urlsafe(16)}"
 
-    # Create pending transaction (store in kobo)
+    # Create pending transaction
     transaction = Transaction(
-        reference=reference,
         wallet_id=wallet.id,
+        reference=reference,
         type=TransactionType.DEPOSIT.value,
-        amount=Decimal(str(amount_kobo)),
+        amount=amount_kobo,  # Store as kobo
         status=TransactionStatus.PENDING.value,
-        description=f"Deposit via Paystack",
-        meta_data=json.dumps({"email": user.email, "amount_naira": str(amount_naira)}),
+        description="Paystack deposit",
+        meta_data=json.dumps({"initiated_at": datetime.utcnow().isoformat()}),
     )
-
     db.add(transaction)
     db.commit()
+    db.refresh(transaction)
 
-    # Initialize Paystack transaction (in kobo)
+    # Initialize Paystack transaction
     try:
         paystack_result = await PaystackService.initialize_transaction(
-            email=user.email, amount=amount_kobo, reference=reference
+            email=wallet.user.email,
+            amount=amount_kobo,  # Send kobo to Paystack
+            reference=reference,
         )
 
         return {
             "reference": reference,
             "authorization_url": paystack_result["authorization_url"],
-            "amount": amount_naira,  # Return Naira to user
+            "amount": amount_kobo / 100,  # Return Naira to user
             "status": "pending",
         }
     except Exception as e:
@@ -243,7 +239,7 @@ def transfer_funds(
     db: Session,
     sender_wallet_id: UUID,
     recipient_wallet_number: str,
-    amount_naira: Decimal,
+    amount_kobo: int,
 ) -> dict:
     """
     Transfer funds from one wallet to another.
@@ -253,7 +249,7 @@ def transfer_funds(
         db: Database session
         sender_wallet_id: Sender's wallet ID
         recipient_wallet_number: Recipient's wallet number
-        amount_naira: Amount to transfer in Naira
+        amount_kobo: Amount to transfer in kobo (e.g., 10000 = NGN 100)
 
     Returns:
         Dict with status and message
@@ -261,8 +257,7 @@ def transfer_funds(
     Raises:
         HTTPException: For various error conditions
     """
-    # Convert Naira to kobo
-    amount_kobo = Decimal(str(int(amount_naira * 100)))
+    # Amount is already in kobo from API, no conversion needed
 
     # Get sender wallet
     sender_wallet = db.query(Wallet).filter(Wallet.id == sender_wallet_id).first()
@@ -281,10 +276,11 @@ def transfer_funds(
             detail="Cannot transfer to your own wallet",
         )
 
-    # Check sender balance (in kobo)
+    # Check sufficient balance
     if sender_wallet.balance < amount_kobo:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Insufficient balance"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Insufficient balance. Available: {sender_wallet.balance} kobo",
         )
 
     # Generate reference
