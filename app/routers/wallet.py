@@ -39,28 +39,29 @@ async def get_balance(
     Get wallet balance.
 
     **Auth**: JWT or API key with `read` permission
+
+    **Returns**: Balance in kobo (e.g., 10000 = ₦100.00)
     """
     wallet = get_wallet_by_user(db, auth["user_id"])
-    # Convert balance from kobo to Naira for user-facing response
-    balance_naira = float(wallet.balance) / 100
-    return {"balance": f"{balance_naira:.2f}", "wallet_number": wallet.wallet_number}
+    return {"balance": str(wallet.balance), "wallet_number": wallet.wallet_number}
 
 
 @router.post(
     "/deposit", response_model=DepositResponse, status_code=status.HTTP_201_CREATED
 )
-async def create_deposit(
+async def initialize_deposit(
     deposit_data: DepositRequest,
     auth: dict = Depends(require_permission("deposit")),
     db: Session = Depends(get_db),
 ):
     """
-    Initialize a Paystack deposit.
+    Initialize Paystack deposit.
 
     **Auth**: JWT or API key with `deposit` permission
 
-    **Request**:
-    - `amount`: Amount in kobo (minimum 10000 kobo = 100 NGN)
+    **Amount**: In kobo (e.g., 10000 = ₦100.00)
+
+    **Returns**: Paystack payment link for user to complete payment
 
     **Response**:
     - `authorization_url`: Paystack payment link
@@ -135,7 +136,7 @@ async def check_deposit_status(
 
 
 @router.post("/transfer", response_model=TransferResponse)
-async def create_transfer(
+async def transfer_money(
     transfer_data: TransferRequest,
     auth: dict = Depends(require_permission("transfer")),
     db: Session = Depends(get_db),
@@ -145,14 +146,17 @@ async def create_transfer(
 
     **Auth**: JWT or API key with `transfer` permission
 
-    **Request**:
-    - `wallet_number`: Recipient's 13-digit wallet number
-    - `amount`: Amount in kobo
+    **Amount**: In kobo (e.g., 10000 = ₦100.00)
+
+    **Validates**:
+    - Sufficient balance
+    - Valid recipient wallet
+    - Cannot transfer to self
 
     **Errors**:
-    - Insufficient balance
-    - Invalid recipient wallet
-    - Cannot transfer to self
+    - 400: Insufficient balance
+    - 404: Invalid recipient wallet
+    - 400: Cannot transfer to self
     """
     wallet = get_wallet_by_user(db, auth["user_id"])
     result = transfer_funds(
@@ -176,10 +180,9 @@ async def get_transactions_endpoint(
     **Query Parameters**:
     - `limit`: Max transactions to return (default: 50)
     - `offset`: Number of transactions to skip (default: 0)
+
+    **Returns**: Amounts in kobo (e.g., 10000 = ₦100.00)
     """
     wallet = get_wallet_by_user(db, auth["user_id"])
     transactions = get_transactions(db, wallet.id, limit, offset)
-    # Convert amounts from kobo to Naira for display
-    for txn in transactions:
-        txn.amount = float(txn.amount) / 100
     return transactions

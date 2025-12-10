@@ -29,10 +29,29 @@ async def lifespan(app: FastAPI):
 
 # Create FastAPI application
 app = FastAPI(
-    title="Wallet Service with Paystack, JWT & API Keys",
-    description="Complete wallet service with Google OAuth, API key management, Paystack deposits, and transfers",
-    version="2.0.0",
+    title="Wallet Service API",
+    description="""
+    Backend wallet service with Paystack integration, JWT authentication, and API key management.
+    
+    ## Authentication Methods
+    
+    ### 1. JWT Bearer Token
+    - Obtain via `/auth/login` or `/auth/signup` or `/auth/google/callback`
+    - Use in Swagger: Click **Authorize** → Enter token in **BearerAuth** field
+    - Format: `Authorization: Bearer <your_jwt_token>`
+    
+    ### 2. API Key
+    - Create via `/keys/create` (requires JWT first)
+    - Use in Swagger: Click **Authorize** → Enter key in **ApiKeyAuth** field
+    - Format: `x-api-key: <your_api_key>`
+    
+    **Note**: Some endpoints accept EITHER JWT OR API key (with proper permissions).
+    """,
+    version="1.0.0",
     lifespan=lifespan,
+    swagger_ui_parameters={
+        "persistAuthorization": True,
+    },
     docs_url="/docs",
     redoc_url="/redoc",
 )
@@ -55,6 +74,46 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Configure OpenAPI security schemes for Swagger UI
+app.openapi_schema = None  # Reset to regenerate with security
+
+from fastapi.openapi.utils import get_openapi
+
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+
+    # Add security schemes
+    openapi_schema["components"]["securitySchemes"] = {
+        "BearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+            "description": "Enter your JWT token obtained from login/signup",
+        },
+        "ApiKeyAuth": {
+            "type": "apiKey",
+            "in": "header",
+            "name": "x-api-key",
+            "description": "Enter your API key (create via /keys/create)",
+        },
+    }
+
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
+app.openapi = custom_openapi
+
 
 # Include routers
 app.include_router(auth.router)
